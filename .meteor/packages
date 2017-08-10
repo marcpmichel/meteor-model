@@ -21,3 +21,5 @@ insecure@1.0.7                # Allow all DB writes from clients (for prototypin
 dburles:collection-helpers
 aldeed:simple-schema
 practicalmeteor:mocha
+aldeed:collection2
+sewdn:collection-behaviours

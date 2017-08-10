@@ -16,15 +16,17 @@ export const Scenarios = new class extends Mongo.Collection {
       description: { type: String, optional: true },
       owner: { type: String, optional: true }
     });
+
+		this.attachSchema(this.schema);
   }
 
   all(conds={}) { return this.find(conds); }
 	count(conds) { return this.all(conds).count(); }
-  validate(data) { return this.schema ? this.schema.validate(data) : data; }
-  clean(data) { return this.schema ? this.schema.clean(data) : data; }
-  create(attrs) { this.clean(attrs); this.validate(attrs); return Scenarios.insert(attrs); }
-	deleteAll(conds={}) { 
-		Scenarios.find(conds).fetch().forEach((doc)=>{ const s = Scenarios.findOne(doc._id); s.destroy(); });
+  // validate(data) { return this.schema ? this.schema.validate(data) : data; }
+  // clean(data) { return this.schema ? this.schema.clean(data) : data; }
+  create(attrs) { /* this.clean(attrs); this.validate(attrs); */ return Scenarios.insert(attrs); }
+	destroyAll(conds={}) { 
+		this.all(conds).forEach( doc=>doc.destroy() );
 	}
 
 }

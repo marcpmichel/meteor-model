@@ -9,12 +9,14 @@ describe('Projects', function() {
 	function createProject() { return Projects.$create({name: 'test', description:'test'}); }
 
 	beforeEach(function() {
-		Projects.remove({});
+		Projects.destroyAll({});
 	});
 
 	it('can create a project', function() {
 		expect(createProject).not.to.throw()
 		expect(Projects.count()).to.equal(1);
+		project = Projects.findOne();
+		expect(_.isDate(project.createdAt)).to.be.true;
 	});
 
 	it('validates', function() {

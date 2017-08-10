@@ -9,7 +9,7 @@ describe('Scenarios', function() {
 	function createScenario() { return Scenarios.create({name:"test scenario", projectId:"1" }) }
 
 	beforeEach(function() {
-		Scenarios.deleteAll()
+		Scenarios.destroyAll()
 	})
 
 	it('can create a Scenario', function() {
@@ -18,7 +18,7 @@ describe('Scenarios', function() {
 
 	it('can delete all', function() {
 		createScenario()
-		Scenarios.deleteAll()
+		Scenarios.destroyAll()
 		expect(Scenarios.count()).to.equal(0)
 	})
 
