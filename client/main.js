@@ -4,44 +4,63 @@ import { ReactiveVar } from 'meteor/reactive-var';
 import '/node_modules/webix/webix.css'
 import 'webix';
 import 'webix-meteor-data';
-import {Projects} from '/imports/projects.js';
+//import '/lib/webix-meteor.js';
+const Projects = new Meteor.Collection('projects'); // Projects.all(); 
+const projects_proxy = webix.proxy('meteor', Projects);
+// import {Projects} from '/imports/projects.js';
 
-const list_data = [
-	{ id:1, value:'One'},
-	{ id:2, value:'Two'},
-	{ id:3, value:'Three'}
-];
+
+const ui = {};
+ui.toolbar = { view:'toolbar', elements: [
+				{ view:'label', label:'Hey' },
+				{ view:'button', id:'show_modal', label:'modal', autowidth: true, align:'right' }
+			]}
+
+ui.list = { id:'list', view:'list', template:'#name#', select:true, width: 250,
+	data: [
+		{id:1, name:'one'},
+		{id:2, name:'two'},
+		{id:3, name:'three'}
+	]
+}
+
+ui.form = { id:'form', view:'form', elements: [
+	{view:'text', name:'name', label:'name' },
+	{ cols: [
+		{view:'button', label:'add', type:'form', id:'submit', autowidth: true },
+		{}
+	]},
+	{}
+]}
+
+ui.content = { cols: [ ui.list, ui.form ]}
+ui.layout = { rows:[ ui.toolbar, ui.content ] }
+
 
 webix.ready(function() {
-	webix.ui({
-		rows:[
-			{ view:'toolbar', elements: [
-				{ view:'label', label:'Hey' },
-				{ view:'button', id:'show_modal', label:'modal' }
-			]},
-			{ cols:[
-				{ id:'list', view:'list', url:webix.proxy('meteor', Projects), template:'#name#', select:true, width: 250},
-				{ view:'template', template:'webix' },
-			]}
-		]
-
-	});
+	webix.ui(ui.layout);
 /*
-	webix.ui({
-		id:'modal1', view:'window', move:true, position:'center',
-		head:{ view:'toolbar', elements:[ 
-			{ view:'label', label:'Window1'}, 
-			{ view:'button', label:'X', align:'right', autowidth: true, click:function() {$$('modal1').hide();  }  }
-		]},
-		body:{ template:'window !' }
-	});
-
 	$$('show_modal').attachEvent('onItemClick', function() { $$('modal1').show(); });
 */
+	// $$('list').load(webix.proxy('meteor', Projects));
+	$$('list').load(projects_proxy)
 
-	$$('list').attachEvent('onAfterLoad', function() { $$('list').select($$('list').getFirstId()); });
-	$$('list').attachEvent('onItemClick', function(i) { webix.message(i); });
+	$$('list').attachEvent('onAfterLoad', function() {
+		$$('list').select($$('list').getFirstId());
+	});
 
+	$$('list').attachEvent('onItemClick', function(id) { 
+		webix.message( $$('list').getItem(id).name ); 
+	});
+
+	$$('submit').attachEvent('onItemClick', function() {
+		const vals = $$('form').getValues();
+		console.log(vals);
+		Projects.insert(vals, function(err, res) {
+			if(err) webix.error(err);
+			else webix.message(res);
+		});
+	});
 
 });
 
