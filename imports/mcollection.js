@@ -14,6 +14,12 @@ export class MCollection extends Mongo.Collection {
 			hasOne: [],				
 			belongsTo: [],
 			STI: false, 			// { key: 'type', value: 'B' } ??
+			before_create: null,  // callback
+			before_update: null,  // callback
+			before_delete: null,  // callback
+			after_create: null,  // callback
+			after_update: null,  // callback
+			after_delete: null,  // callback
 		});
 
 		// check(config.collectionName);
@@ -46,7 +52,9 @@ export class MCollection extends Mongo.Collection {
 
 			documentMethods['create_'+name] = function(attrs) {
 				attrs[options.foreignKey] = this._id;
-				return collection(options).create(attrs);
+				const ret = collection(options).create(attrs);
+				callback('after_create', attrs);
+				return ret;
 			}
 
 			documentMethods['$create_'+name] = function(attrs) {
@@ -77,16 +85,33 @@ export class MCollection extends Mongo.Collection {
 		  //   if(options.dependent == 'destroy') {
 			//   }
 			// })
+			_callback('before_delete');
 			self.remove(this._id);
+			_callback('after_delete');
+		}
+
+		documentMethods['update'] = function(attrs) {
+			if(!_callback('before_update', attrs)) return;
+			// do update
+			_callback('after_update', attrs);
 		}
 
 		this.helpers(documentMethods);  // collection-helpers
 		// this.helpers({pouet() { return "pouet"; }}) 
 	}
 
+	function _callback(name, attrs) {
+			return (_.isFunction(options[name]) && options[name](attrs)) || true;
+	}
+
 	all(attrs={}) { return this.find(attrs); }
 	count(attrs={}) { return this.find(attrs).count(); }
-	create(attrs={}) { return this.insert(attrs); }
+	create(attrs={}) { 
+		if(!_callback('before_create', attrs)) return;
+		const id = this.insert(attrs); 
+		_callback('after_create', attrs);
+		return id;
+	}
 	$create(attrs={}) { return this.findOne(this.create(attrs)); }
 	destroyAll(conds={}) { this.all(conds).forEach( doc=>doc.destroy() ) }
 }
