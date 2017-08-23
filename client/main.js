@@ -28,6 +28,7 @@ ui.form = { id:'form', view:'form', elements: [
 	{view:'text', name:'name', label:'name' },
 	{ cols: [
 		{view:'button', label:'add', type:'form', id:'submit', autowidth: true },
+		{view:'button', label:'remove', type:'danger', id:'btn_delete', autowidth: true },
 		{}
 	]},
 	{}
@@ -36,6 +37,10 @@ ui.form = { id:'form', view:'form', elements: [
 ui.content = { cols: [ ui.list, ui.form ]}
 ui.layout = { rows:[ ui.toolbar, ui.content ] }
 
+function error(err) {
+		console.log(err);
+		webix.message({type: 'error', text:err, expire: 10000});
+}
 
 webix.ready(function() {
 	webix.ui(ui.layout);
@@ -56,11 +61,23 @@ webix.ready(function() {
 	$$('submit').attachEvent('onItemClick', function() {
 		const vals = $$('form').getValues();
 		console.log(vals);
-		Projects.insert(vals, function(err, res) {
-			if(err) webix.error(err);
+		// Projects.insert(vals, function(err, res) {
+		Meteor.call('project.add', vals, function(err, res) {
+			if(err) error(err); 
 			else webix.message(res);
 		});
 	});
 
+	$$('btn_delete').attachEvent('onItemClick', function(a,b,c) {
+		const item = $$('list').getSelectedItem();
+		if(!item) return;
+		const projectId = item.id;
+		Meteor.call('project.delete', projectId, function(err, res) {
+			if(err) error(err);
+		})
+	})
+
 });
+
+Meteor.subscribe('projects');
 
