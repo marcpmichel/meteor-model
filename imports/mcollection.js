@@ -4,6 +4,11 @@ import { Mongo } from 'meteor/mongo';
 import check from 'meteor/check';
 
 export class MCollection extends Mongo.Collection {
+
+	static Declare(config) {
+		return new class extends MCollection {} (config);
+	}
+
 	constructor(config) {
 
 		_.defaults(config, { 
@@ -14,18 +19,21 @@ export class MCollection extends Mongo.Collection {
 			hasOne: [],				
 			belongsTo: [],
 			STI: false, 			// { key: 'type', value: 'B' } ??
-			before_create: null,  // callback
-			before_update: null,  // callback
-			before_delete: null,  // callback
-			after_create: null,  // callback
-			after_update: null,  // callback
-			after_delete: null,  // callback
+			callbacks: {
+				before_create: null,
+				before_update: null,
+				before_destroy: null,
+				after_create: null,
+				after_update: null,
+				after_destroy: null
+			}
 		});
 
 		// check(config.collectionName);
 		super(config.collectionName, { _suppressSameNameError:true });
 
 		this.config = config;
+		this.callbacks = config.callbacks;
 		var self = this;
 
 		if(config.schema) this.attachSchema(new SimpleSchema(config.schema));
@@ -34,8 +42,10 @@ export class MCollection extends Mongo.Collection {
 		_.each(config.behaviors, (b) => { this[b](); });
 
 
-		// inject relations methods 
+		// ------- inject relations methods --------
 
+		// Working around the forward declaration problem :
+		// i.e. : declare Cars has many Wheels, then declare Wheels belongsTo Cars
 		function collection(options) {
 				return _.isFunction(options.collection) ? options.collection() : options.collection;
 		}
@@ -53,7 +63,7 @@ export class MCollection extends Mongo.Collection {
 			documentMethods['create_'+name] = function(attrs) {
 				attrs[options.foreignKey] = this._id;
 				const ret = collection(options).create(attrs);
-				callback('after_create', attrs);
+				self._callback('after_create', attrs);
 				return ret;
 			}
 
@@ -66,8 +76,9 @@ export class MCollection extends Mongo.Collection {
 
 		// hasOne
 		_.each(config.hasOne, (options, name) => {
+			if(options.as) name = options.as;
 			documentMethods[name] = function() {
-				conds = {}; conds[key] = this._id;
+				conds = {}; conds[options.key] = self._id;
 				return collection(options).findOne(conds);
 			}
 		})
@@ -85,31 +96,32 @@ export class MCollection extends Mongo.Collection {
 		  //   if(options.dependent == 'destroy') {
 			//   }
 			// })
-			_callback('before_delete');
+			if(!self._callback('before_destroy')) return;
 			self.remove(this._id);
-			_callback('after_delete');
+			self._callback('after_destroy');
 		}
 
-		documentMethods['update'] = function(attrs) {
-			if(!_callback('before_update', attrs)) return;
-			// do update
-			_callback('after_update', attrs);
+		documentMethods['update'] = function(attrs={}) {
+			if(!self._callback('before_update', attrs)) return;
+			self.update(this._id, {$set: attrs});
+			self._callback('after_update', attrs);
 		}
 
 		this.helpers(documentMethods);  // collection-helpers
-		// this.helpers({pouet() { return "pouet"; }}) 
+		// this.helpers({pouet() { return "pouet"; }})
 	}
 
-	function _callback(name, attrs) {
-			return (_.isFunction(options[name]) && options[name](attrs)) || true;
+	_callback(name, attrs) {
+		const cb = this.callbacks[name]
+		return _.isFunction(cb) ? cb(attrs) : true;
 	}
 
 	all(attrs={}) { return this.find(attrs); }
 	count(attrs={}) { return this.find(attrs).count(); }
 	create(attrs={}) { 
-		if(!_callback('before_create', attrs)) return;
+		if(!this._callback('before_create', attrs)) return;
 		const id = this.insert(attrs); 
-		_callback('after_create', attrs);
+		this._callback('after_create', attrs);
 		return id;
 	}
 	$create(attrs={}) { return this.findOne(this.create(attrs)); }

@@ -24,7 +24,6 @@ export const Dialogs = new class extends AssetsCollection {
 		this.find = this.all;
 	}
 
-	// /!\ don't use find, use all() because of inheritance !
 	all(conds={}) { conds.type='dialog'; return this._find_(conds); }
 	count(conds={}) { return this.all(conds).count(); }
 }

@@ -13,8 +13,10 @@ describe('MCollection', function() {
 	function reset() {
 		const Cars = new class extends MCollection {} ({collectionName: 'cars'})
 		const Wheels = new class extends MCollection {} ({collectionName: 'wheels'})
+		const DrivingWheels = new class extends MCollection {} ({collectionName: 'driving_wheels'})
 		Cars.remove({});
 		Wheels.remove({});
+		DrivingWheels.remove({});
 	}
 
 	beforeEach(function() {
@@ -98,6 +100,16 @@ describe('MCollection', function() {
 			expect( car ).to.respondTo('destroy');
 		})
 
+		it.skip('destroys relations', function() {
+			const Wheels = createCollection({collectionName: 'wheels'})
+			const Cars = createCollection({ 
+				collectionName: 'cars', 
+				hasMany: { 'wheels': { collection: Wheels, foreignKey: 'carId' } } 
+			})
+			const car = Cars.$create({name:'a car'})
+			// create Wheels
+		})
+
 		it('creates has_many relationships', function() {
 			const wheels_config = { collectionName: 'wheels' };
 			const Wheels = new class extends MCollection {} (wheels_config)
@@ -121,14 +133,16 @@ describe('MCollection', function() {
 		})
 
 		it('creates a hasOne relationship', function() {
-			const Configs = createCollection({collectionName: 'config'});
-			const Projects = createCollection({
-				collectionName: 'profile', 
-				hasOne:{ 'config': { collection: Configs, key: 'configId' } } 
+			const DrivingWheels = createCollection({collectionName: 'driving_wheels'});
+			const Cars = createCollection({
+				collectionName: 'cars', 
+				hasOne:{ 'config': { collection: DrivingWheels, key: 'drivingWheelId', as: 'driving_wheel' } } 
 			});
-			config = Configs.$create({name:'Config1'})
-			project = Projects.$create({name:'Project1', configId: config._id })
-			expect(project.config).to.be.a('function');
+			drivingWheel = DrivingWheels.$create({name:'The driving wheel'})
+			car = Cars.$create({name:'A car', drivingWheelId: drivingWheel._id })
+			expect(car.driving_wheel).to.be.a('function');
+			// FIXME
+			expect(car.driving_wheel()._id).to.equal(drivingWheel._id);
 		})
 
 		it('creates belongsTo relationship', function() {
@@ -149,12 +163,18 @@ describe('MCollection', function() {
 
 			const Cars = createCollection({
 				collectionName:'cars', 
-				hasMany: { 'wheels': { collection: function(){return Wheels;}, foreignKey: 'carId' } }
-			})
+				hasMany: { 'wheels': { 
+					collection: function() {return Wheels}, // Wheels is not declared yet...
+					foreignKey: 'carId'
+				}}
+			});
 
 			const Wheels = createCollection({
 				collectionName:'wheels',
-				belongsTo: { 'car': { collection: Cars, key:'carId' } }
+				belongsTo: { 'car': {
+					collection: function() { return Cars }, 
+					key:'carId' }
+				}
 			})
 
 			car = Cars.$create({name:'one'})
@@ -167,6 +187,135 @@ describe('MCollection', function() {
 		})
 	})
 
+	describe('Callbacks', function() {
+		describe('beforeCreate', function() {
+			it('has a beforeCreate callback', function() {
+				const Cars = createCollection({
+					collectionName:'cars',
+					callbacks: { 
+						before_create: function(attrs) { attrs.name = 'before_create called'; return true; }
+					}
+				})
+				
+				car = Cars.$create({name:"name"});
+				expect(car.name).to.equal("before_create called");
+			})
+
+			it('does not create if callback returns false', function() {
+				const Cars = createCollection({
+					collectionName:'cars',
+					callbacks: {
+						before_create: function(attrs) { attrs.name='before_create called'; return false; }
+					}
+				})
+
+				car = Cars.$create({name:"hey"});
+				expect(car).to.be.undefined;
+			})
+
+		});
+
+		describe('after_create', function() {
+			it('has a after_create callback', function() {
+				let after_create_called = false;
+				const Cars = createCollection({
+					collectionName: 'cars',
+					callbacks: {
+						after_create: function(attrs) {
+							after_create_called = true;
+						}
+					}
+				})
+
+				expect(after_create_called).to.be.false;
+				Cars.create({name: 'a car'});
+				expect(after_create_called).to.be.true;
+			})
+		})
+
+		describe('before_update', function() {
+			it('has a before_update callback', function() {
+				let before_update_called = false
+				const Cars = createCollection({
+					collectionName: 'cars',
+					callbacks: {
+						before_update: function(attrs) {
+							before_update_called = true;
+						}
+					}
+				})
+				const car = Cars.$create({name:'another car'})
+				expect(before_update_called).to.be.false
+				car.update({name: "my car"})
+				expect(before_update_called).to.be.true
+			})
+
+			it('does not update if before_update returns false', function() {
+				const Cars = createCollection({
+					collectionName: 'cars',
+					callbacks: {
+						before_update: function(attrs) { return false; }
+					}
+				})
+				let car = Cars.$create({name: 'my car'})
+				car.update({name: 'xxx'})
+				car = Cars.findOne(car._id)
+				expect(car.name).to.equal('my car')
+			})
+		})
+
+		describe('after_update', function() {
+			it('has an after_update callback', function() {
+				let after_update_called = false;
+				const Cars = createCollection({
+					collectionName: 'cars',
+					callbacks: { after_update: function(attrs) { after_update_called = true } }
+				})
+				const car = Cars.$create({name:'a car'})
+				car.update({name:'my car'})
+				expect(after_update_called).to.be.true
+			})
+		})
+
+		describe('before_destroy', function() {
+			it('has a before_destroy callback', function() {
+				let before_destroy_called = false
+				const Cars = createCollection({
+					collectionName: 'cars',
+					callbacks: { before_destroy: function(attrs) { before_destroy_called = true } }
+				})
+				const car = Cars.$create({name:'car1'})
+				car.destroy();
+				expect(before_destroy_called).to.be.true
+			})
+
+			it('does not destroy if the callback returns false', function() {
+				const Cars = createCollection({
+					collectionName: 'cars',
+					callbacks: { before_destroy: function(attrs) { return false; } }
+				})
+				let car = Cars.$create({name:'car1'})
+				car.destroy()
+				car = Cars.findOne(car._id)
+				expect(car).not.to.be.undefined
+			})
+		})
+
+		describe('after_destroy', function() {
+			it('has an after_destroy callback', function() {
+				let after_destroy_called = false
+				const Cars = createCollection({
+					collectionName: 'cars',
+					callbacks: { after_destroy: function(attrs) { after_destroy_called = true } }
+				})
+				let car = Cars.$create({name:'car1'})
+				car.destroy()
+				car = Cars.findOne(car._id)
+				expect(after_destroy_called).to.be.true
+			})
+		})
+
+	}) 
 
 })
 }

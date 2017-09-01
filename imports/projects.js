@@ -33,16 +33,18 @@ Projects.helpers({
 	destroy() { this.scenarios().forEach( doc=>doc.destroy() ); Projects.remove(this._id);  }
 });
 
-Meteor.methods({
-	'project.add'(attrs) {
-		return Projects.create(attrs);
-	},
-	'project.delete'(projectId) {
-		return Projects.findOne(projectId).destroy();
-	}
-})
+if(Meteor.isServer) {
+	Meteor.methods({
+		'project.add'(attrs) {
+			return Projects.create(attrs);
+		},
+		'project.delete'(projectId) {
+			return Projects.findOne(projectId).destroy();
+		}
+	})
 
-Meteor.publish('projects', function() {
-	return Projects.all();
-})
+	Meteor.publish('projects', function() {
+		return Projects.all();
+	})
+}
 
